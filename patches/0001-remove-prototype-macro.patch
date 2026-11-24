@@ -1,0 +1,19 @@
+--- a/arctic_fan_controller.c
++++ b/arctic_fan_controller.c
+@@ -336,7 +336,7 @@
+ 	return ret;
+ }
+ 
+-static void arctic_fan_remove(struct hid_device *hdev)
++ARCTIC_REMOVE_PROTO(arctic_fan_remove)(struct hid_device *hdev)
+ {
+ 	struct arctic_fan_data *priv = hid_get_drvdata(hdev);
+ 
+@@ -354,6 +354,7 @@
+ 	hwmon_device_unregister(priv->hwmon_dev);
+ 	hid_hw_close(hdev);
+ 	hid_hw_stop(hdev);
++	ARCTIC_REMOVE_RETURN
+ }
+ 
+ static const struct hid_device_id arctic_fan_id_table[] = {
