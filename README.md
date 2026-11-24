@@ -52,7 +52,20 @@ make KDIR=/usr/src/linux-headers-6.12.9-amd64
 ## Stay current across kernel updates (recommended)
 
 Plain `make install` pins the module to one kernel. With DKMS it rebuilds on every
-kernel package install:
+kernel package install (the `/etc/kernel/{,header_}postinst.d/dkms` hooks do it via
+`AUTOINSTALL="yes"`).
+
+```sh
+sudo scripts/dkms-setup.sh
+```
+
+The script mirrors the source into `/usr/src/arctic-fan-controller-<version>/`,
+replaces any previous registration (so re-running it is how you update after
+editing the source), then runs `dkms add` → `build` → `install` for the running
+kernel. It refuses to install on a 7.2+ kernel, where the driver is already
+in-tree (`--force` overrides). Preview it with `--dry-run`.
+
+Equivalent manual steps, if you prefer:
 
 ```sh
 sudo apt install dkms
@@ -60,6 +73,19 @@ sudo mkdir -p /usr/src/arctic-fan-controller-1.0
 sudo cp -r src patches shim scripts Makefile dkms.conf /usr/src/arctic-fan-controller-1.0/
 sudo dkms install arctic-fan-controller/1.0
 ```
+
+Notes for the real world, verified against dkms 3.4.1:
+
+- `Deprecated feature: CLEAN (.../dkms.conf)` is **harmless**. DKMS 3.x cleans the
+  build tree itself; the directive is kept because Ubuntu 22.04 still ships dkms 2.8,
+  where it is honoured.
+- DKMS 3.x builds in `/var/lib/dkms/<pkg>/<ver>/build` and looks for the `.ko` at the
+  **top** of that tree when `BUILT_MODULE_LOCATION` is unset — which is why the
+  Makefile has a `dkms-build` target that copies it up one level. The nested
+  `build/build/` directory you see during a DKMS build is expected.
+- With Secure Boot enabled, DKMS signs with `/var/lib/dkms/mok.key`, generating and
+  enrolling a MOK on first use (`mokutil --sb-state` to check; enrolment needs a
+  reboot and a password at the MOK Manager screen).
 
 Once your kernel is 7.2 or newer the driver is in-tree; then
 `sudo dkms remove arctic-fan-controller/1.0 --all` and forget about it.
@@ -123,6 +149,7 @@ shim/linux/unaligned.h        used only when the kernel lacks the real header
 patches/0001-*.patch          2 hunks: ->remove() prototype + return
 Makefile                      probing, build, install, uninstall, info
 dkms.conf                     DKMS packaging
+scripts/dkms-setup.sh         stage + add + build + install, idempotent
 scripts/verify.sh             post-install checks (--spin does a duty round trip)
 scripts/refresh-upstream.sh   pull newer upstream, check the patch still applies
 ```
